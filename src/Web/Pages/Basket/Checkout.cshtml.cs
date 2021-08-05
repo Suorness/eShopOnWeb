@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using ESH.Abstractions.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +13,8 @@ using Microsoft.eShopWeb.Web.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 
 namespace Microsoft.eShopWeb.Web.Pages.Basket
@@ -60,6 +63,30 @@ namespace Microsoft.eShopWeb.Web.Pages.Basket
                 var updateModel = items.ToDictionary(b => b.Id.ToString(), b => b.Quantity);
                 await _basketService.SetQuantities(BasketModel.Id, updateModel);
                 await _orderService.CreateOrderAsync(BasketModel.Id, new Address("123 Main St.", "Kent", "OH", "United States", "44240"));
+
+                var positions = new List<Item>();
+
+                foreach (var item in BasketModel.Items)
+                {
+                    positions.Add(new Item
+                    {
+                        Id = item.Id.ToString(),
+                        Count = item.Quantity.ToString(),
+                        Name = item.ProductName,
+                    });
+                }
+
+                var order = new ESH.Abstractions.Models.Order
+                {
+                    Items = positions.AsReadOnly()
+                };
+
+                var httpClient = new HttpClient();
+
+                await httpClient.PostAsJsonAsync("https://functionapptask91.azurewebsites.net/api/DeliveryOrderFunction", order);
+                await httpClient.PostAsJsonAsync("https://functionappqueuesender.azurewebsites.net/api/OrderSenderFunction", order);
+
+
                 await _basketService.DeleteBasketAsync(BasketModel.Id);               
             }
             catch (EmptyBasketOnCheckoutException emptyBasketOnCheckoutException)
